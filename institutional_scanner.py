@@ -1,3 +1,24 @@
+"""
+================================================================================
+INSTITUTIONAL FOOTPRINT SCANNER — AUTO MODE (for GitHub Actions)
+================================================================================
+Ye version GitHub Actions ke through roz automatically chalta hai. Isko haath
+se chalane ki zaroorat nahi — workflow file (.github/workflows/daily-scan.yml)
+isse har trading day market band hone ke baad khud trigger karti hai.
+
+Kya karta hai:
+  1. NSE F&O stocks ka price, volume, OI fetch karta hai
+  2. oi_history.csv me roz ka data append karta hai (ye repo me commit hoti hai)
+  3. Institutional action (Long Buildup / Short Covering / etc.) classify karta hai
+  4. Final ranked result ko scan_result.json me likh deta hai
+     -> Dashboard (oi_scanner_auto.html) seedha isi JSON file ko GitHub se
+        fetch karke dikhata hai. Kisi manual paste ki zaroorat nahi.
+
+DISCLAIMER: Ye ek educational/technical screening tool hai, investment advice
+nahi. Institutional activity ka estimate hai, confirmation nahi.
+================================================================================
+"""
+
 import pandas as pd
 import numpy as np
 import os
@@ -6,9 +27,29 @@ import time
 from datetime import datetime
 
 try:
-    from nsepython import fnolist, nse_eq, nse_fno
+    from nsepython import nse_eq, nse_fno
 except ImportError:
     raise SystemExit("Pehle ye run karein: pip install nsepython pandas numpy")
+
+# nsepython ka fnolist() function abhi NSE ke site-structure change ki wajah se
+# fail ho raha hai, isliye popular F&O stocks ki apni fixed list use kar rahe hain.
+# Zaroorat ho to isme aur symbols add/remove kar sakte hain.
+FNO_SYMBOLS = [
+    "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "SBIN", "BHARTIARTL",
+    "KOTAKBANK", "LT", "AXISBANK", "ITC", "HINDUNILVR", "BAJFINANCE", "MARUTI",
+    "TATASTEEL", "TATAMOTORS", "SUNPHARMA", "TITAN", "ADANIENT", "ADANIPORTS",
+    "ULTRACEMCO", "NTPC", "POWERGRID", "M&M", "WIPRO", "HCLTECH", "TECHM",
+    "BAJAJFINSV", "ONGC", "JSWSTEEL", "GRASIM", "INDUSINDBK", "COALINDIA",
+    "CIPLA", "DRREDDY", "EICHERMOT", "HEROMOTOCO", "BAJAJ-AUTO", "BPCL",
+    "DIVISLAB", "SBILIFE", "HDFCLIFE", "APOLLOHOSP", "NESTLEIND", "BRITANNIA",
+    "TATACONSUM", "UPL", "VEDL", "PIDILITIND", "DLF", "SIEMENS", "GODREJCP",
+    "HAVELLS", "AMBUJACEM", "SHREECEM", "ICICIGI", "ICICIPRULI", "BANKBARODA",
+    "PNB", "IDFCFIRSTB", "FEDERALBNK", "CANBK", "AUROPHARMA", "LUPIN",
+    "BIOCON", "MOTHERSON", "BOSCHLTD", "MRF", "TVSMOTOR", "ASHOKLEY",
+    "ZOMATO", "NYKAA", "PAYTM", "IRCTC", "TATAPOWER", "ADANIGREEN",
+    "ADANIPOWER", "JINDALSTEL", "SAIL", "NMDC", "HINDALCO", "NATIONALUM",
+    "GAIL", "IOC", "PETRONET", "CONCOR", "BEL", "HAL", "BHEL",
+]
 
 HISTORY_FILE = "oi_history.csv"
 RESULT_FILE = "scan_result.json"
@@ -113,9 +154,8 @@ def score_row(row, avg_volume_map, oi_trend):
 
 
 def scan_market():
-    print("F&O stock list fetch ho raha hai...")
-    symbols = fnolist()
-    print(f"Total {len(symbols)} F&O stocks milein. Data fetch shuru...")
+    symbols = FNO_SYMBOLS
+    print(f"Total {len(symbols)} F&O stocks ke saath scan shuru ho raha hai...")
 
     today_df = fetch_today_snapshot(symbols)
     if today_df.empty:
